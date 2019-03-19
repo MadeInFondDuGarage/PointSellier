@@ -9,3 +9,5 @@ Pour windows, il faut les mettre dans le répertoire d'installation d'inkscape n
 Le répertoire contient déja un grands nombre d'extension
 
 Au redémarrage de inkscape, les extensions seront trouver et monter dans le menu.
+
+https://inkscape.org/gallery/=extension/

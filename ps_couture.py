@@ -29,6 +29,8 @@ as painted on these lines.
 
 Now move and bend L to make it fit a skeleton, and see what happens to the normals:
 they move and rotate, deforming the pattern.
+
+Mod pour creation de point couture par Vantieghem David 2018-2019
 '''
 
 # standard library
@@ -83,7 +85,7 @@ def linearize(p,tolerance=0.001):
     lengths=[l for l in lengths if l>zero]
     return(new,lengths)
 
-def addDot(self,idPoint,labelPoint,diametre,typepoint):
+def addDot(self,idPoint,labelPoint,diametre,typepoint, Couleur):
 
     dot = inkex.etree.Element(inkex.addNS('path','svg'))
     dot.set('id',idPoint)
@@ -96,9 +98,26 @@ def addDot(self,idPoint,labelPoint,diametre,typepoint):
     if typepoint=="Cercle":
         rayon=cercle.replace('dia',str(self.unittouu(diametre)/2))
     dot.set('d',rayon)
-    dot.set('style', simplestyle.formatStyle({ 'stroke': '#000000', 'fill': 'none','stroke-opacity':'1', 'stroke-width': str(self.unittouu('1px')) }))
+    Style= { 'stroke': '#000000', 'fill': 'none','stroke-opacity':'1', 'stroke-width': str(self.unittouu('1px')) }
+    dot.set('style', simplestyle.formatStyle(Style))
     dot.set(inkex.addNS('label','inkscape'), labelPoint)
     self.current_layer.append(dot)
+
+def addMark(self,x,y,idPoint,labelPoint,diametre, Couleur):
+
+    dot = inkex.etree.Element(inkex.addNS('path','svg'))
+    dot.set('id',idPoint)
+    cercle='M 0,0 V dia'
+    rayon=cercle.replace('dia',str(self.unittouu(diametre)))
+    dot.set('d',rayon)
+    dot.set('x', str(x))
+    dot.set('y', str(y))
+    Style= { 'stroke': '#000000', 'fill': 'none','stroke-opacity':'1', 'stroke-width': str(self.unittouu('1px')) }
+    Style['stroke']= Couleur
+    dot.set('style', simplestyle.formatStyle(Style))
+    dot.set(inkex.addNS('label','inkscape'), labelPoint)
+    self.current_layer.append(dot)
+    return dot
 
 def addText(self,x,y,text):
     new = inkex.etree.Element(inkex.addNS('text','svg'))
@@ -138,9 +157,9 @@ class Pointsellier(pathmodifier.Diffeo):
                         action="store", type="inkbool",
                         dest="autoOffset", default=False)
 
-        self.OptionParser.add_option("-r", "--nrepeat",
+        self.OptionParser.add_option("-r","--nrepeat",
                         action="store", type="int",
-                        dest="nrepeat", default=1,help="nombre dobjet")
+                        dest="nrepeat", default=1,help="nombre d'objets")
 
         self.OptionParser.add_option("--autoRepeat",
                         action="store", type="inkbool",
@@ -149,6 +168,18 @@ class Pointsellier(pathmodifier.Diffeo):
         self.OptionParser.add_option("--autoMask",
                         action="store", type="inkbool",
                         dest="autoMask", default=False)
+
+        self.OptionParser.add_option("--autoMark",
+                        action="store", type="inkbool",
+                        dest="autoMark", default=False)
+
+        self.OptionParser.add_option("--typeMark",
+                        action="store", type="string",
+                        dest="typeMark", default="markX")
+
+        self.OptionParser.add_option( "--nrepeat2",
+                        action="store", type="int",
+                        dest="nrepeat2", default=1,help="nombre d'objets")
 
         self.OptionParser.add_option("--tab",
                         action="store", type="string",
@@ -207,11 +238,12 @@ class Pointsellier(pathmodifier.Diffeo):
         if len(self.options.ids)<1 and len(self.options.ids)>1:
             inkex.errormsg("This extension requires only one selected paths.")
             return
-   #liste des chemins, preparation
+        #liste des chemins, preparation
         idList=self.options.ids
         idList=pathmodifier.zSort(self.document.getroot(),idList)
         id = idList[-1]
         idpoint=id+'-'+ str(random.randint(1, 99)) #id du paterns creer a partir du chemin selectionner
+        idpointMark=id+'-'+ str(random.randint(1, 99))
 
         for id, node in self.selected.iteritems():
             if node.tag == inkex.addNS('path','svg'):
@@ -234,28 +266,33 @@ class Pointsellier(pathmodifier.Diffeo):
 
                 distance=self.unittouu(self.options.space)
                 taille= self.unittouu(self.options.diamlong)
+                MaxCopies=max(1,int(round((longeur+distance)/distance)))
+
+                NbCopies= self.options.nrepeat #nombre de copie desirer a integrer dans les choix a modifier pour ne pas depasser les valeurs maxi
+                
+                if NbCopies > MaxCopies:
+                    NbCopies=MaxCopies #on limitte le nombre de copie au maxi possible sur le chemin
 
                 if self.options.autoRepeat: #gestion du calcul auto
-                    nbrRepeat=int(round((longeur)/distance))
-                else:
-                    nbrRepeat=self.options.nrepeat
+                    NbCopies=MaxCopies
+
 
                 if self.options.autoOffset: #gestion du decallage automatique
-                    tOffset=((longeur-(nbrRepeat-1)*distance)/2)-taille/2
+                    tOffset=((longeur-(NbCopies-1)*distance)/2)-taille/2
                 else:
                     tOffset=self.unittouu(self.options.toffset)
 
-                #gestion du paterns
-                labelpoint='Point:'+self.options.diamlong+' Ecart:'+self.options.space + ' Decallage:' + str(round(self.uutounit(tOffset,'mm'),2))+'mm' + ' Nbr:' + str(nbrRepeat)+' longueur:'+str(round(self.uutounit(longeur,'mm'),2))+'mm'
-                addDot(self,idpoint,labelpoint,self.options.diamlong,self.options.typePoint)#creation du cercle de base
-                self.patterns={idpoint:self.getElementById(idpoint)} #ajout du point dans le paterns de base
 
+                #gestion du paterns
+                labelpoint='Point: '+ idpoint+ ' Nbr:' + str(NbCopies)+' longueur:'+str(round(self.uutounit(longeur,'mm'),2))+'mm'
+                addDot(self,idpoint,labelpoint,self.options.diamlong,self.options.typePoint,0)#creation du cercle de base
+                self.patterns={idpoint:self.getElementById(idpoint)} #ajout du point dans le paterns de base
+                
                 bbox=simpletransform.computeBBox(self.patterns.values())
            #liste des chemins, fin de preparation
 
                 if distance < 0.01:
                     exit(_("The total length of the pattern is too small :\nPlease choose a larger object or set 'Space between copies' > 0"))
-
                 for id, node in self.patterns.iteritems():
 
                     if node.tag == inkex.addNS('path','svg') or node.tag=='path':
@@ -270,15 +307,10 @@ class Pointsellier(pathmodifier.Diffeo):
                                 #!!!!>----> TODO: really test if path is closed! end point==start point is not enough!
                                 self.skelcompIsClosed = (self.skelcomp[0]==self.skelcomp[-1])
 
-                                length=sum(self.lengths)
                                 xoffset=self.skelcomp[0][0]-bbox[0]+tOffset
                                 yoffset=self.skelcomp[0][1]-(bbox[2]+bbox[3])/2
                                 if self.options.textInfos:
                                     addText(self,xoffset,yoffset,labelpoint)
-                                MaxCopies=max(1,int(round((length+distance)/distance)))
-                                NbCopies= nbrRepeat #nombre de copie desirer a intergrer dans les choix a modifier pour ne pas depasser les valeurs maxi
-                                if NbCopies > MaxCopies:
-                                    NbCopies=MaxCopies #on limitte le nombre de copie au maxi possible sur le chemin
                                 width=distance*NbCopies
                                 if not self.skelcompIsClosed:
                                     width-=distance
@@ -286,20 +318,81 @@ class Pointsellier(pathmodifier.Diffeo):
                                 new=[]
                                 for sub in p: #creation du nombre de patern
                                     for i in range(0,NbCopies,1):
-                                        new.append(copy.deepcopy(sub)) #realise une copie de sub pour chaque nouveau element du patern
+                                        new.append(copy.deepcopy(sub)) #realise une copie de sub pour chaque nouveau element du patern                                        
                                         offset(sub,distance,0)
                                 p=new
                                 for sub in p:
                                     offset(sub,xoffset,yoffset)
                                 for sub in p: #une fois tous creer, on les mets en place
                                     for ctlpt in sub:#pose le patern sur le chemin
-                                            self.applyDiffeo(ctlpt[1],(ctlpt[0],ctlpt[2]))
+                                        self.applyDiffeo(ctlpt[1],(ctlpt[0],ctlpt[2]))
 
                                 newp+=p
 
                         node.set('d', cubicsuperpath.formatPath(newp))
+                    else:
+                        inkex.errormsg("This extension need a path, not groups.")
+
+        if self.options.autoMark:
+            if self.options.typeMark=="markFraction":
+                Fraction= self.options.nrepeat2 #en mode fraction 1= au debut et a la fin, 2= un demi, 3= 1/3 etc 
+                distance=(width)/Fraction #distance inter point
+                NbrMark=max(1,int(round((width+distance)/distance))) 
+                infos= " Marquage 1/"+ str(Fraction)
+                couleur= '#ff0000'
             else:
-                inkex.errormsg("This extension need a path, not groups.")
+                Repeat= self.options.nrepeat2  #en mode fraction 1= au debut et a la fin, 2= un demi, 3= 1/3 etc 
+                NbrMark=max(1,int(round((NbCopies/Repeat)))) 
+                distance=distance*Repeat #distance inter point
+                infos=" Marquage tous les " + str(Repeat) + " points"
+                couleur= '#ffaa00'
+
+            labelMark="Mark: "+idpoint + infos
+            addMark(self,0,0,idpointMark,labelMark,self.options.diamlong,couleur)
+            self.patternsMark={idpointMark:self.getElementById(idpointMark)} #ajout du point dans le paterns de base
+            
+            bbox=simpletransform.computeBBox(self.patternsMark.values())
+            #liste des chemins, fin de preparation
+            if distance < 0.01:
+                exit(_("The total length of the pattern is too small :\nPlease choose a larger object or set 'Space between copies' > 0"))
+            for id, node in self.patternsMark.iteritems():
+
+                if node.tag == inkex.addNS('path','svg') or node.tag=='path':
+                    d = node.get('d')
+                    p0 = cubicsuperpath.parsePath(d)
+                    newp=[]
+                    for skelnode in self.skeletons.itervalues():
+                        self.curSekeleton=cubicsuperpath.parsePath(skelnode.get('d'))
+                        for comp in self.curSekeleton:
+                            p=copy.deepcopy(p0)
+                            self.skelcomp,self.lengths=linearize(comp)
+                            #!!!!>----> TODO: really test if path is closed! end point==start point is not enough!
+                            self.skelcompIsClosed = (self.skelcomp[0]==self.skelcomp[-1])
+# a tester si les point au dessus sont utilisable pour positionner les autres a upoi ressemble skelcomp ??
+                            xoffset=self.skelcomp[0][0]-bbox[0] +tOffset+taille/2
+                            yoffset=self.skelcomp[0][1]-(bbox[2]+bbox[3])/2
+
+                            width=distance*NbrMark
+                            if not self.skelcompIsClosed:
+                                width-=distance
+
+                            new=[]
+                            for sub in p: #creation du nombre de patern
+                                for i in range(0,NbrMark,1):
+                                    new.append(copy.deepcopy(sub)) #realise une copie de sub pour chaque nouveau element du patern
+                                    offset(sub,distance,0)
+                            p=new
+                            for sub in p:
+                                offset(sub,xoffset,yoffset)
+                            for sub in p: #une fois tous creer, on les mets en place
+                                for ctlpt in sub:#pose le patern sur le chemin
+                                    self.applyDiffeo(ctlpt[1],(ctlpt[0],ctlpt[2]))
+
+                            newp+=p
+
+                    node.set('d', cubicsuperpath.formatPath(newp))
+                else:
+                    inkex.errormsg("This extension need a path, not groups.")
 
 if __name__ == '__main__':
     e = Pointsellier()

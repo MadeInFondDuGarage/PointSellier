@@ -11,3 +11,7 @@ Le répertoire contient déja un grands nombre d'extension
 Au redémarrage de inkscape, les extensions seront trouver et monter dans le menu.
 
 https://inkscape.org/gallery/=extension/
+
+une video sur leur usage
+
+https://youtu.be/FcclrkKXhYs
